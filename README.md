@@ -1,1 +1,1 @@
-# diabetes-prediction-ml
+diabetes-bhav-model
