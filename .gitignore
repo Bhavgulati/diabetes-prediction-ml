@@ -15,4 +15,8 @@ __pycache__/
 *.pkl
 
 # Environment variables
-.env
+.env.env
+Diabetes-prediction deployed/.env
+Diabetes-prediction deployed/.end
+Diabetes-prediction deployed/diabetesai.db
+*.db

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiabetesAI — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #030712; --card: #111827; --border: rgba(255,255,255,0.07);
+      --accent: #00d4ff; --accent2: #7c3aed;
+      --danger: #ff4d6d; --safe: #10b981; --warn: #f59e0b;
+      --text: #f1f5f9; --muted: #64748b;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh; padding-bottom: 60px;
+    }
+
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 60px 60px; pointer-events: none; z-index: 0;
+    }
+
+    nav {
+      position: relative; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 48px; border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .nav-right { display: flex; align-items: center; gap: 16px; }
+
+    .nav-user {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px; color: var(--muted);
+    }
+
+    .nav-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid rgba(0,212,255,0.3);
+    }
+
+    .nav-btn {
+      font-size: 13px; padding: 8px 16px;
+      border-radius: 8px; border: 1px solid var(--border);
+      color: var(--text); text-decoration: none;
+      transition: all 0.2s; background: transparent; cursor: pointer;
+    }
+    .nav-btn:hover { border-color: rgba(255,255,255,0.2); }
+    .nav-btn.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; color: #fff;
+    }
+
+    .container {
+      position: relative; z-index: 10;
+      max-width: 960px; margin: 0 auto; padding: 0 24px;
+    }
+
+    .page-header {
+      padding: 40px 0 32px;
+      animation: fadeUp 0.7s ease both;
+    }
+
+    .page-header h1 {
+      font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800;
+      letter-spacing: -1px; margin-bottom: 6px;
+    }
+
+    .page-header p { font-size: 14px; color: var(--muted); }
+
+    /* Stats row */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+      margin-bottom: 32px;
+      animation: fadeUp 0.7s 0.1s ease both;
+    }
+
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px;
+      position: relative; overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+
+    .stat-card.c1::before { background: linear-gradient(90deg, var(--accent), transparent); }
+    .stat-card.c2::before { background: linear-gradient(90deg, var(--accent2), transparent); }
+    .stat-card.c3::before { background: linear-gradient(90deg, var(--safe), transparent); }
+    .stat-card.c4::before { background: linear-gradient(90deg, var(--warn), transparent); }
+
+    .stat-icon { font-size: 20px; margin-bottom: 10px; }
+    .stat-label { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+    .stat-value { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 700; }
+
+    /* Chart */
+    .section { margin-bottom: 28px; animation: fadeUp 0.7s 0.2s ease both; }
+
+    .section-title {
+      font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700;
+      margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
+    }
+
+    .section-tag {
+      font-size: 10px; background: rgba(0,212,255,0.08);
+      color: var(--accent); border: 1px solid rgba(0,212,255,0.15);
+      padding: 2px 10px; border-radius: 99px; letter-spacing: 1px; text-transform: uppercase;
+    }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px;
+      position: relative; overflow: hidden;
+    }
+
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+    }
+
+    .chart-wrap { position: relative; height: 280px; }
+
+    /* History table */
+    .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .history-table th {
+      text-align: left; padding: 10px 12px;
+      color: var(--muted); font-size: 11px; letter-spacing: 1px;
+      text-transform: uppercase; border-bottom: 1px solid var(--border);
+    }
+    .history-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .risk-pill {
+      display: inline-block; padding: 3px 10px; border-radius: 99px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .risk-pill.High     { background: rgba(255,77,109,0.15); color: var(--danger); }
+    .risk-pill.Moderate { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .risk-pill.Low      { background: rgba(16,185,129,0.15); color: var(--safe); }
+
+    .empty-state {
+      text-align: center; padding: 60px 24px; color: var(--muted);
+    }
+    .empty-state .emoji { font-size: 48px; margin-bottom: 16px; }
+    .empty-state p { font-size: 14px; margin-bottom: 20px; }
+
+    @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
+
+    @media(max-width:600px) {
+      nav { padding: 16px 20px; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-logo">⬡ DiabetesAI</div>
+    <div class="nav-right">
+      <div class="nav-user">
+        <img src="{{ user.picture }}" alt="{{ user.name }}" class="nav-avatar">
+        {{ user.name }}
+      </div>
+      <a href="/" class="nav-btn primary">+ New Assessment</a>
+      <a href="/logout" class="nav-btn">Logout</a>
+    </div>
+  </nav>
+
+  <div class="container">
+
+    <div class="page-header">
+      <h1>Your Health Dashboard</h1>
+      <p>Track your diabetes risk over time · {{ total }} assessment{% if total != 1 %}s{% endif %} completed</p>
+    </div>
+
+    {% set history = history | from_json %}
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card c1">
+        <div class="stat-icon">📊</div>
+        <div class="stat-label">Total Assessments</div>
+        <div class="stat-value">{{ total }}</div>
+      </div>
+      <div class="stat-card c2">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-label">Latest Risk</div>
+        <div class="stat-value">
+          {% if history %}{{ history[-1].risk }}%{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="stat-card c3">
+        <div class="stat-icon">📉</div>
+        <div class="stat-label">Lowest Risk</div>
+        <div class="stat-value">
+          {% if history %}{{ history | map(attribute='risk') | min }}%{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="stat-card c4">
+        <div class="stat-icon">📈</div>
+        <div class="stat-label">Highest Risk</div>
+        <div class="stat-value">
+          {% if history %}{{ history | map(attribute='risk') | max }}%{% else %}—{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if history %}
+
+    <!-- Trend Chart -->
+    <div class="section">
+      <div class="section-title">
+        📈 Risk Trend Over Time
+        <span class="section-tag">Your Progress</span>
+      </div>
+      <div class="card">
+        <div class="chart-wrap">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Table -->
+    <div class="section">
+      <div class="section-title">
+        📋 Assessment History
+        <span class="section-tag">All Records</span>
+      </div>
+      <div class="card">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Risk Score</th>
+              <th>Category</th>
+              <th>Glucose</th>
+              <th>BMI</th>
+              <th>Age</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in history | reverse %}
+            <tr>
+              <td>{{ h.date }}</td>
+              <td><b>{{ h.risk }}%</b></td>
+              <td><span class="risk-pill {{ h.category }}">{{ h.category }}</span></td>
+              <td>{{ h.glucose }}</td>
+              <td>{{ h.bmi }}</td>
+              <td>{{ h.age }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% else %}
+
+    <div class="card">
+      <div class="empty-state">
+        <div class="emoji">🩺</div>
+        <p>No assessments yet. Take your first diabetes risk assessment!</p>
+        <a href="/" class="nav-btn primary" style="display:inline-block; padding:12px 28px;">
+          Start Assessment →
+        </a>
+      </div>
+    </div>
+
+    {% endif %}
+
+  </div>
+
+  <script>
+    const history = {{ history | safe }};
+
+    if (history.length > 0) {
+      const ctx = document.getElementById('trendChart').getContext('2d');
+
+      // Color each point based on risk
+      const pointColors = history.map(h =>
+        h.risk >= 70 ? '#ff4d6d' : h.risk >= 40 ? '#f59e0b' : '#10b981'
+      );
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: history.map(h => h.date),
+          datasets: [{
+            label: 'Diabetes Risk %',
+            data: history.map(h => h.risk),
+            borderColor: '#00d4ff',
+            backgroundColor: 'rgba(0,212,255,0.06)',
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
+            pointRadius: 6,
+            pointHoverRadius: 9,
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` Risk: ${ctx.raw}%`
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: {
+              min: 0, max: 100,
+              ticks: { color: '#64748b', font: { size: 11 }, callback: v => v + '%' },
+              grid: { color: 'rgba(255,255,255,0.04)' }
+            }
+          }
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>
