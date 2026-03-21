@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiabetesAI — API Docs</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030712; --card: #111827; --border: rgba(255,255,255,0.07);
+      --accent: #00d4ff; --accent2: #7c3aed; --safe: #10b981; --warn: #f59e0b;
+      --danger: #ff4d6d; --text: #f1f5f9; --muted: #64748b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+    body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; z-index: 0; }
+    nav { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 20px 48px; border-bottom: 1px solid var(--border); }
+    .nav-logo { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-back { font-size: 13px; color: var(--muted); text-decoration: none; border: 1px solid var(--border); padding: 7px 14px; border-radius: 8px; transition: all 0.2s; }
+    .nav-back:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .container { position: relative; z-index: 10; max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+    .hero { margin-bottom: 48px; }
+    .hero-tag { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: var(--accent); background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.15); padding: 4px 14px; border-radius: 99px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px; }
+    h1 { font-family: 'Syne', sans-serif; font-size: 40px; font-weight: 800; letter-spacing: -1.5px; margin-bottom: 12px; }
+    h1 span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { font-size: 16px; color: var(--muted); line-height: 1.7; max-width: 600px; }
+    .base-url { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); margin-top: 20px; display: inline-block; }
+    .endpoint { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; margin-bottom: 20px; position: relative; overflow: hidden; }
+    .endpoint::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+    .endpoint.get::before  { background: linear-gradient(90deg, var(--safe), transparent); }
+    .endpoint.post::before { background: linear-gradient(90deg, var(--accent), transparent); }
+    .endpoint-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .method { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; letter-spacing: 1px; }
+    .method.get  { background: rgba(16,185,129,0.15); color: var(--safe); }
+    .method.post { background: rgba(0,212,255,0.15); color: var(--accent); }
+    .endpoint-path { font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--text); }
+    .endpoint-desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+    .section-label { font-size: 11px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; margin-top: 16px; }
+    .code-block { background: #0d1117; border: 1px solid var(--border); border-radius: 10px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #94a3b8; line-height: 1.8; overflow-x: auto; white-space: pre; }
+    .code-block .key   { color: #7dd3fc; }
+    .code-block .str   { color: #86efac; }
+    .code-block .num   { color: #fbbf24; }
+    .code-block .punct { color: #94a3b8; }
+    .param-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    .param-table th { text-align: left; padding: 8px 12px; color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 500; }
+    .param-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .param-table tr:last-child td { border-bottom: none; }
+    .required { font-size: 10px; background: rgba(255,77,109,0.1); color: var(--danger); border: 1px solid rgba(255,77,109,0.2); padding: 2px 7px; border-radius: 4px; }
+    .try-btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: #fff; padding: 10px 20px; border-radius: 8px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 16px; transition: all 0.2s; }
+    .try-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .response-box { margin-top: 12px; display: none; }
+    .response-box.show { display: block; }
+    .status-pill { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 99px; font-family: 'JetBrains Mono', monospace; margin-bottom: 8px; }
+    .status-200 { background: rgba(16,185,129,0.15); color: var(--safe); }
+    .status-422 { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .status-400 { background: rgba(255,77,109,0.15); color: var(--danger); }
+    h2 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 20px; letter-spacing: -0.5px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-logo">⬡ DiabetesAI</div>
+    <a href="/" class="nav-back">← Back to App</a>
+  </nav>
+
+  <div class="container">
+    <div class="hero">
+      <div class="hero-tag">REST API v1.0</div>
+      <h1>DiabetesAI <span>API Docs</span></h1>
+      <p>Integrate diabetes risk prediction into any application. Send patient biomarkers and receive instant risk scores powered by our Random Forest model.</p>
+      <div class="base-url">Base URL: https://diabetes-prediction-ml-2-dt3u.onrender.com</div>
+    </div>
+
+    <h2>Endpoints</h2>
+
+    <!-- Health Check -->
+    <div class="endpoint get">
+      <div class="endpoint-header">
+        <span class="method get">GET</span>
+        <span class="endpoint-path">/api/health</span>
+      </div>
+      <div class="endpoint-desc">Check if the API is running. Use this to verify connectivity before making prediction requests.</div>
+      <div class="section-label">Response 200</div>
+      <div class="code-block"><span class="punct">{</span>
+  <span class="key">"status"</span><span class="punct">:</span> <span class="str">"healthy"</span><span class="punct">,</span>
+  <span class="key">"service"</span><span class="punct">:</span> <span class="str">"DiabetesAI API"</span><span class="punct">,</span>
+  <span class="key">"version"</span><span class="punct">:</span> <span class="str">"1.0.0"</span><span class="punct">,</span>
+  <span class="key">"timestamp"</span><span class="punct">:</span> <span class="str">"2026-03-22T10:00:00"</span>
+<span class="punct">}</span></div>
+      <button class="try-btn" onclick="tryHealth()">▶ Try it</button>
+      <div class="response-box" id="health-response"></div>
+    </div>
+
+    <!-- Predict -->
+    <div class="endpoint post">
+      <div class="endpoint-header">
+        <span class="method post">POST</span>
+        <span class="endpoint-path">/api/predict</span>
+      </div>
+      <div class="endpoint-desc">Submit patient biomarkers and receive a diabetes risk score, category, and confidence level. No authentication required.</div>
+
+      <div class="section-label">Request Body (JSON)</div>
+      <table class="param-table">
+        <thead><tr><th>Parameter</th><th>Type</th><th>Range</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>pregnancies</td><td>integer</td><td>0 – 20</td><td><span class="required">required</span></td></tr>
+          <tr><td>glucose</td><td>integer</td><td>1 – 600 mg/dL</td><td><span class="required">required</span></td></tr>
+          <tr><td>bloodpressure</td><td>integer</td><td>1 – 200 mmHg</td><td><span class="required">required</span></td></tr>
+          <tr><td>skinthickness</td><td>integer</td><td>0 – 100 mm</td><td><span class="required">required</span></td></tr>
+          <tr><td>insulin</td><td>integer</td><td>0 – 900 IU/mL</td><td><span class="required">required</span></td></tr>
+          <tr><td>bmi</td><td>float</td><td>1 – 80 kg/m²</td><td><span class="required">required</span></td></tr>
+          <tr><td>dpf</td><td>float</td><td>0 – 3</td><td><span class="required">required</span></td></tr>
+          <tr><td>age</td><td>integer</td><td>1 – 120 years</td><td><span class="required">required</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="section-label">Example Request</div>
+      <div class="code-block"><span class="punct">{</span>
+  <span class="key">"pregnancies"</span><span class="punct">:</span>   <span class="num">2</span><span class="punct">,</span>
+  <span class="key">"glucose"</span><span class="punct">:</span>       <span class="num">180</span><span class="punct">,</span>
+  <span class="key">"bloodpressure"</span><span class="punct">:</span> <span class="num">80</span><span class="punct">,</span>
+  <span class="key">"skinthickness"</span><span class="punct">:</span> <span class="num">35</span><span class="punct">,</span>
+  <span class="key">"insulin"</span><span class="punct">:</span>       <span class="num">100</span><span class="punct">,</span>
+  <span class="key">"bmi"</span><span class="punct">:</span>           <span class="num">34.2</span><span class="punct">,</span>
+  <span class="key">"dpf"</span><span class="punct">:</span>           <span class="num">0.8</span><span class="punct">,</span>
+  <span class="key">"age"</span><span class="punct">:</span>           <span class="num">45</span>
+<span class="punct">}</span></div>
+
+      <div class="section-label">Response 200 — Success</div>
+      <div class="code-block"><span class="punct">{</span>
+  <span class="key">"risk_percent"</span><span class="punct">:</span>  <span class="num">78.5</span><span class="punct">,</span>
+  <span class="key">"risk_category"</span><span class="punct">:</span> <span class="str">"High"</span><span class="punct">,</span>
+  <span class="key">"prediction"</span><span class="punct">:</span>    <span class="num">1</span><span class="punct">,</span>
+  <span class="key">"confidence"</span><span class="punct">:</span>    <span class="num">78.5</span><span class="punct">,</span>
+  <span class="key">"message"</span><span class="punct">:</span>       <span class="str">"High diabetes risk detected (78.5%)"</span>
+<span class="punct">}</span></div>
+
+      <div class="section-label">Response 422 — Validation Error</div>
+      <div class="code-block"><span class="punct">{</span>
+  <span class="key">"error"</span><span class="punct">:</span>   <span class="str">"Validation failed"</span><span class="punct">,</span>
+  <span class="key">"details"</span><span class="punct">:</span> <span class="punct">[</span><span class="str">"Glucose must be between 1 and 600 mg/dL"</span><span class="punct">]</span>
+<span class="punct">}</span></div>
+
+      <button class="try-btn" onclick="tryPredict()">▶ Try it</button>
+      <div class="response-box" id="predict-response"></div>
+    </div>
+
+  </div>
+
+  <script>
+    async function tryHealth() {
+      const box = document.getElementById('health-response');
+      box.classList.add('show');
+      box.innerHTML = '<div class="code-block">Loading...</div>';
+      try {
+        const res  = await fetch('/api/health');
+        const data = await res.json();
+        box.innerHTML = `<div class="status-pill status-200">200 OK</div><div class="code-block">${JSON.stringify(data, null, 2)}</div>`;
+      } catch(e) {
+        box.innerHTML = `<div class="code-block">Error: ${e.message}</div>`;
+      }
+    }
+
+    async function tryPredict() {
+      const box = document.getElementById('predict-response');
+      box.classList.add('show');
+      box.innerHTML = '<div class="code-block">Loading...</div>';
+      try {
+        const res  = await fetch('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pregnancies: 2, glucose: 180, bloodpressure: 80,
+            skinthickness: 35, insulin: 100, bmi: 34.2, dpf: 0.8, age: 45
+          })
+        });
+        const data = await res.json();
+        const status = res.status;
+        box.innerHTML = `<div class="status-pill status-${status}">${status} ${status===200?'OK':'Error'}</div><div class="code-block">${JSON.stringify(data, null, 2)}</div>`;
+      } catch(e) {
+        box.innerHTML = `<div class="code-block">Error: ${e.message}</div>`;
+      }
+    }
+  </script>
+</body>
+</html>
