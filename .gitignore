@@ -14,8 +14,8 @@ __pycache__/
 # Model file (regenerated locally)
 *.pkl
 
-# Environment variables
-.env.env
+# Environment variables file
+.env
 Diabetes-prediction deployed/.env
 Diabetes-prediction deployed/.end
 Diabetes-prediction deployed/diabetesai.db
