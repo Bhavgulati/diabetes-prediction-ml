@@ -777,8 +777,8 @@ def chat():
     rag_context  = ""
     sources_used = []
 
-    if RAG_AVAILABLE and not auto_explain:
-    # ✅ Lazy build — runs once on first chat, not at startup
+if RAG_AVAILABLE and not auto_explain:
+    # ✅ Lazy build haha — runs once on first chat, not at startup
     if not is_knowledge_base_ready():
         try:
             from rag_engine import build_knowledge_base
@@ -797,7 +797,7 @@ def chat():
                 logger.info(f"RAG | query='{user_message[:40]}' | chunks={len(chunks)} | category={category}")
         except Exception as e:
             logger.error(f"RAG retrieval failed: {e}")
-            
+
 
     if auto_explain:
         system_prompt = """You are a medical AI assistant. Explain diabetes risk results in plain English.
