@@ -78,13 +78,7 @@ except Exception as e:
     RAG_AVAILABLE = False
     print(f"⚠️  RAG not available (run rag/setup_rag.py first): {e}")
 
-if RAG_AVAILABLE and not is_knowledge_base_ready():
-    try:
-        from rag_engine import build_knowledge_base
-        build_knowledge_base()
-        print("✅ RAG knowledge base built automatically")
-    except Exception as e:
-        print(f"⚠️  RAG auto-build failed: {e}")    
+    
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -783,7 +777,17 @@ def chat():
     rag_context  = ""
     sources_used = []
 
-    if RAG_AVAILABLE and not auto_explain and is_knowledge_base_ready():
+    if RAG_AVAILABLE and not auto_explain:
+    # ✅ Lazy build — runs once on first chat, not at startup
+    if not is_knowledge_base_ready():
+        try:
+            from rag_engine import build_knowledge_base
+            build_knowledge_base()
+            logger.info("RAG knowledge base built on first request")
+        except Exception as e:
+            logger.error(f"RAG lazy build failed: {e}")
+    # Now retrieve context if ready
+    if is_knowledge_base_ready():
         try:
             category = detect_query_category(user_message)
             chunks   = retrieve_context(user_message, n_results=3, category_filter=category)
@@ -793,6 +797,7 @@ def chat():
                 logger.info(f"RAG | query='{user_message[:40]}' | chunks={len(chunks)} | category={category}")
         except Exception as e:
             logger.error(f"RAG retrieval failed: {e}")
+            
 
     if auto_explain:
         system_prompt = """You are a medical AI assistant. Explain diabetes risk results in plain English.
