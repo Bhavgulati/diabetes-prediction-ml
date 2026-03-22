@@ -61,7 +61,6 @@ db = SQLAlchemy(app)
 
 # ════════════════════════════════════════
 #  ✅ RAG — Retrieval Augmented Generation
-#  Loads medical knowledge from rag/ folder
 # ════════════════════════════════════════
 sys.path.insert(0, os.path.join(BASE_DIR, 'rag'))
 try:
@@ -76,9 +75,7 @@ try:
     print("✅ RAG engine loaded — chatbot will use WHO + ADA guidelines")
 except Exception as e:
     RAG_AVAILABLE = False
-    print(f"⚠️  RAG not available (run rag/setup_rag.py first): {e}")
-
-    
+    print(f"⚠️  RAG not available: {e}")
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -130,24 +127,21 @@ def log_error(endpoint, error, user_email=None):
 
 
 # ════════════════════════════════════════
-#  ✅ RATE LIMITING (no Redis needed)
+#  ✅ RATE LIMITING
 # ════════════════════════════════════════
 rate_limit_store = defaultdict(list)
 
 def rate_limit(max_calls, window_seconds):
-    """Decorator: limit to max_calls per window_seconds per IP"""
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             ip  = request.remote_addr
             now = time.time()
             key = f.__name__ + ':' + ip
-
             rate_limit_store[key] = [
                 t for t in rate_limit_store[key]
                 if now - t < window_seconds
             ]
-
             if len(rate_limit_store[key]) >= max_calls:
                 logger.warning(f"RATE_LIMIT | ip={ip} | endpoint={f.__name__}")
                 return jsonify({
@@ -155,7 +149,6 @@ def rate_limit(max_calls, window_seconds):
                     'message': f'Maximum {max_calls} requests per {window_seconds}s. Please slow down.',
                     'retry_after': window_seconds
                 }), 429
-
             rate_limit_store[key].append(now)
             return f(*args, **kwargs)
         return wrapper
@@ -220,7 +213,6 @@ def load_model_version(version, filename):
         return True
     return False
 
-# Base ML setup (needed before model loading)
 df = pd.read_csv(os.path.join(BASE_DIR, '..', 'diabetes.csv'))
 X = df.drop('Outcome', axis=1)
 y = df['Outcome']
@@ -242,7 +234,6 @@ try:
 except Exception:
     xgb_available = False
 
-# Load model versions
 load_model_version('v1', 'diabetes-prediction-rfc-model.pkl')
 
 LATEST_VERSION = 'v1'
@@ -256,7 +247,6 @@ if rf_model is None:
 explainer = shap.TreeExplainer(rf_model)
 
 def get_model_for_version(version=None):
-    """Get model by version string, fallback to latest"""
     if version and version in MODELS:
         return MODELS[version], version
     return MODELS[LATEST_VERSION], LATEST_VERSION
@@ -761,7 +751,6 @@ def download_report():
 
 # ════════════════════════════════════════
 #  ✅ RAG-POWERED CHAT ROUTE
-#  Uses WHO + ADA guidelines via ChromaDB
 # ════════════════════════════════════════
 @app.route('/chat', methods=['POST'])
 @login_required
@@ -773,38 +762,36 @@ def chat():
     risk_category = request.json.get('risk_category', 'Moderate')
     auto_explain  = request.json.get('auto_explain', False)
 
-    # ✅ RAG: Retrieve relevant medical context from knowledge base
+    # ✅ RAG: Retrieve relevant medical context
     rag_context  = ""
     sources_used = []
 
-if RAG_AVAILABLE and not auto_explain:
-    # ✅ Lazy build haha — runs once on first chat, not at startup
-    if not is_knowledge_base_ready():
-        try:
-            from rag_engine import build_knowledge_base
-            build_knowledge_base()
-            logger.info("RAG knowledge base built on first request")
-        except Exception as e:
-            logger.error(f"RAG lazy build failed: {e}")
-    # Now retrieve context if ready
-    if is_knowledge_base_ready():
-        try:
-            category = detect_query_category(user_message)
-            chunks   = retrieve_context(user_message, n_results=3, category_filter=category)
-            if chunks:
-                rag_context  = format_context_for_claude(chunks)
-                sources_used = list(set(c['source'] for c in chunks))
-                logger.info(f"RAG | query='{user_message[:40]}' | chunks={len(chunks)} | category={category}")
-        except Exception as e:
-            logger.error(f"RAG retrieval failed: {e}")
-
+    if RAG_AVAILABLE and not auto_explain:
+        # ✅ Lazy build — runs once on first chat, not at startup
+        if not is_knowledge_base_ready():
+            try:
+                from rag_engine import build_knowledge_base
+                build_knowledge_base()
+                logger.info("RAG knowledge base built on first request")
+            except Exception as e:
+                logger.error(f"RAG lazy build failed: {e}")
+        # Retrieve context if ready
+        if is_knowledge_base_ready():
+            try:
+                category = detect_query_category(user_message)
+                chunks   = retrieve_context(user_message, n_results=3, category_filter=category)
+                if chunks:
+                    rag_context  = format_context_for_claude(chunks)
+                    sources_used = list(set(c['source'] for c in chunks))
+                    logger.info(f"RAG | query='{user_message[:40]}' | chunks={len(chunks)} | category={category}")
+            except Exception as e:
+                logger.error(f"RAG retrieval failed: {e}")
 
     if auto_explain:
         system_prompt = """You are a medical AI assistant. Explain diabetes risk results in plain English.
 Be direct, empathetic, and concise. 2-3 sentences max. No bullet points. No medical jargon."""
 
     elif rag_context:
-        # ✅ RAG-powered prompt — Claude answers using retrieved WHO + ADA guidelines
         system_prompt = f"""You are a friendly medical assistant in a diabetes prediction app.
 The patient result: {'DIABETIC' if prediction==1 else 'NOT DIABETIC'} | Risk: {risk_percent}% ({risk_category})
 
@@ -821,7 +808,6 @@ INSTRUCTIONS:
 - Always end with: consult your doctor for personal medical advice"""
 
     else:
-        # Fallback if RAG not ready yet (before setup_rag.py is run)
         system_prompt = f"""You are a friendly, conversational medical assistant in a diabetes prediction app.
 The patient's result is: {'DIABETIC' if prediction==1 else 'NOT DIABETIC'}.
 Their diabetes risk score is: {risk_percent}% ({risk_category} risk).
@@ -858,7 +844,7 @@ def api_health():
         'version':   '1.0.0',
         'models':    list(MODELS.keys()),
         'latest':    LATEST_VERSION,
-        'rag':       get_rag_stats() if RAG_AVAILABLE else {'status': 'disabled'},  # ✅ RAG stats
+        'rag':       get_rag_stats() if RAG_AVAILABLE else {'status': 'disabled'},
         'timestamp': datetime.utcnow().isoformat()
     })
 
