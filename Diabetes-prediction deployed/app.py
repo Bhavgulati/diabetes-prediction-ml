@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import requests as http_requests
 import os
+import sys
 import shap
 import json
 import io
@@ -49,9 +50,54 @@ try:
 except ImportError:
     SENDGRID_AVAILABLE = False
 
+# ── App setup ──
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'local-dev-key')
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(BASE_DIR, 'diabetesai.db')}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 # ════════════════════════════════════════
-#  ✅ NEW: STRUCTURED LOGGING
+#  ✅ RAG — Retrieval Augmented Generation
+#  Loads medical knowledge from rag/ folder
+# ════════════════════════════════════════
+sys.path.insert(0, os.path.join(BASE_DIR, 'rag'))
+try:
+    from rag_engine import (
+        retrieve_context,
+        format_context_for_claude,
+        detect_query_category,
+        get_rag_stats,
+        is_knowledge_base_ready
+    )
+    RAG_AVAILABLE = True
+    print("✅ RAG engine loaded — chatbot will use WHO + ADA guidelines")
+except Exception as e:
+    RAG_AVAILABLE = False
+    print(f"⚠️  RAG not available (run rag/setup_rag.py first): {e}")
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.environ.get('GOOGLE_CLIENT_ID', ''),
+    client_secret=os.environ.get('GOOGLE_CLIENT_SECRET', ''),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
+)
+
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+SENDGRID_API_KEY  = os.environ.get('SENDGRID_API_KEY', '')
+GOOGLE_MAPS_KEY   = os.environ.get('GOOGLE_MAPS_API_KEY', '')
+
+
+# ════════════════════════════════════════
+#  ✅ STRUCTURED LOGGING
 # ════════════════════════════════════════
 logging.basicConfig(
     level=logging.INFO,
@@ -82,9 +128,8 @@ def log_error(endpoint, error, user_email=None):
 
 
 # ════════════════════════════════════════
-#  ✅ NEW: RATE LIMITING (no Redis needed)
+#  ✅ RATE LIMITING (no Redis needed)
 # ════════════════════════════════════════
-# Simple in-memory rate limiter
 rate_limit_store = defaultdict(list)
 
 def rate_limit(max_calls, window_seconds):
@@ -96,7 +141,6 @@ def rate_limit(max_calls, window_seconds):
             now = time.time()
             key = f.__name__ + ':' + ip
 
-            # Clean old calls outside window
             rate_limit_store[key] = [
                 t for t in rate_limit_store[key]
                 if now - t < window_seconds
@@ -116,32 +160,7 @@ def rate_limit(max_calls, window_seconds):
     return decorator
 
 
-# ── App setup ──
-app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'local-dev-key')
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(BASE_DIR, 'diabetesai.db')}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-oauth = OAuth(app)
-google = oauth.register(
-    name='google',
-    client_id=os.environ.get('GOOGLE_CLIENT_ID', ''),
-    client_secret=os.environ.get('GOOGLE_CLIENT_SECRET', ''),
-    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_kwargs={'scope': 'openid email profile'}
-)
-
-ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
-SENDGRID_API_KEY  = os.environ.get('SENDGRID_API_KEY', '')
-GOOGLE_MAPS_KEY   = os.environ.get('GOOGLE_MAPS_API_KEY', '')
-
+# ── Database Models ──
 class User(UserMixin, db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     google_id   = db.Column(db.String(100), unique=True, nullable=False)
@@ -173,10 +192,9 @@ def load_user(user_id):
 
 
 # ════════════════════════════════════════
-#  ✅ NEW: MODEL VERSIONING
+#  MODEL VERSIONING
 # ════════════════════════════════════════
-# Load multiple model versions
-MODELS = {}
+MODELS     = {}
 MODEL_META = {}
 
 def load_model_version(version, filename):
@@ -184,7 +202,6 @@ def load_model_version(version, filename):
     if os.path.exists(path):
         model = pickle.load(open(path, 'rb'))
         MODELS[version] = model
-        # calculate accuracy
         try:
             preds = model.predict(X_test)
             acc   = round(accuracy_score(y_test, preds) * 100, 1)
@@ -226,12 +243,10 @@ except Exception:
 # Load model versions
 load_model_version('v1', 'diabetes-prediction-rfc-model.pkl')
 
-# v1 is latest by default
 LATEST_VERSION = 'v1'
 if MODELS.get('v1'):
     MODEL_META['v1']['is_latest'] = True
 
-# Main model alias
 rf_model = MODELS.get('v1')
 if rf_model is None:
     raise RuntimeError("Could not load model v1")
@@ -567,15 +582,19 @@ def send_email_report(user_email, user_name, risk_percent, risk_category):
         color = {'High':'#c0392b','Moderate':'#d68910','Low':'#1e8449'}.get(risk_category,'#1a4a7a')
         rec   = ('Please consult a doctor immediately.' if risk_category=='High' else
                  'Monitor your health closely.' if risk_category=='Moderate' else 'Keep up your healthy habits!')
-        html  = f"""<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0a2342;color:#f1f5f9;padding:40px;border-radius:8px">
-          <h1 style="color:#a8c8e8">DiabetesAI</h1>
-          <h2>Your Health Report is Ready, {user_name}</h2>
+        html  = f"""
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0a2342;color:#f1f5f9;padding:40px;border-radius:8px">
+          <h1 style="color:#a8c8e8;font-size:22px;margin-bottom:4px">DiabetesAI</h1>
+          <p style="color:#5d8aa8;font-size:12px;margin-bottom:24px">Medical Intelligence Platform</p>
+          <h2 style="font-size:18px">Your Health Report is Ready, {user_name}</h2>
           <div style="background:#061529;border:2px solid {color};border-radius:8px;padding:24px;margin:24px 0;text-align:center">
             <div style="font-size:52px;font-weight:800;color:{color}">{risk_percent}%</div>
-            <div style="font-size:16px;font-weight:700;color:{color};margin-top:6px">{risk_category.upper()} RISK</div>
+            <div style="font-size:16px;font-weight:700;color:{color};margin-top:6px;letter-spacing:2px">{risk_category.upper()} RISK</div>
           </div>
-          <p style="color:#aab7b8">{rec}</p>
-          <p style="color:#7f8c8d;font-size:11px;margin-top:32px">DISCLAIMER: Not medical advice. Consult a qualified healthcare professional.</p>
+          <p style="color:#aab7b8;font-size:14px">{rec}</p>
+          <p style="color:#7f8c8d;font-size:11px;margin-top:32px;border-top:1px solid #1a4a7a;padding-top:16px">
+            DISCLAIMER: This is not a medical diagnosis. Always consult a qualified healthcare professional.
+          </p>
         </div>"""
         message = Mail(from_email='noreply@diabetesai.com', to_emails=user_email,
                        subject=f'DiabetesAI Report — {risk_category} Risk ({risk_percent}%)', html_content=html)
@@ -608,8 +627,12 @@ def callback():
     user_info = token.get('userinfo')
     user      = User.query.filter_by(google_id=user_info['sub']).first()
     if not user:
-        user = User(google_id=user_info['sub'], name=user_info.get('name'),
-                    email=user_info.get('email'), picture=user_info.get('picture'))
+        user = User(
+            google_id=user_info['sub'],
+            name=user_info.get('name'),
+            email=user_info.get('email'),
+            picture=user_info.get('picture')
+        )
         db.session.add(user)
         db.session.commit()
     login_user(user)
@@ -630,15 +653,20 @@ def home():
 @login_required
 def dashboard():
     predictions = Prediction.query.filter_by(user_id=current_user.id).order_by(Prediction.created_at.asc()).all()
-    history = [{'date':p.created_at.strftime('%d %b %Y'),'risk':p.risk_percent,
-                'category':p.risk_category,'glucose':p.glucose,'bmi':p.bmi,'age':p.age}
-               for p in predictions]
+    history = [{
+        'date':     p.created_at.strftime('%d %b %Y'),
+        'risk':     p.risk_percent,
+        'category': p.risk_category,
+        'glucose':  p.glucose,
+        'bmi':      p.bmi,
+        'age':      p.age,
+    } for p in predictions]
     return render_template('dashboard.html', user=current_user,
                            history=json.dumps(history), total=len(predictions))
 
 @app.route('/predict', methods=['POST'])
 @login_required
-@rate_limit(max_calls=20, window_seconds=60)  # ✅ Rate limited: 20 predictions/minute
+@rate_limit(max_calls=20, window_seconds=60)
 def predict():
     start_time = time.time()
     if request.method == 'POST':
@@ -660,7 +688,6 @@ def predict():
         st=int(raw['skinthickness']); insulin=int(raw['insulin']); bmi=float(raw['bmi'])
         dpf=float(raw['dpf']); age=int(raw['age'])
 
-        # ✅ Model versioning: check if specific version requested
         model_version = request.form.get('model_version', LATEST_VERSION)
         active_model, used_version = get_model_for_version(model_version)
 
@@ -699,7 +726,6 @@ def predict():
         db.session.add(pred_record)
         db.session.commit()
 
-        # ✅ Structured logging
         elapsed = round((time.time() - start_time) * 1000, 1)
         inputs_log = {'pregnancies':preg,'glucose':glucose,'bloodpressure':bp,'skinthickness':st,'insulin':insulin,'bmi':bmi,'dpf':dpf,'age':age}
         log_prediction(current_user.id, current_user.email, inputs_log, risk_percent, risk_category, elapsed)
@@ -731,9 +757,13 @@ def download_report():
         mimetype='application/pdf')
 
 
+# ════════════════════════════════════════
+#  ✅ RAG-POWERED CHAT ROUTE
+#  Uses WHO + ADA guidelines via ChromaDB
+# ════════════════════════════════════════
 @app.route('/chat', methods=['POST'])
 @login_required
-@rate_limit(max_calls=30, window_seconds=60)  # ✅ Rate limited: 30 chats/minute
+@rate_limit(max_calls=30, window_seconds=60)
 def chat():
     user_message  = request.json.get('message')
     prediction    = int(request.json.get('prediction', 0))
@@ -741,10 +771,44 @@ def chat():
     risk_category = request.json.get('risk_category', 'Moderate')
     auto_explain  = request.json.get('auto_explain', False)
 
+    # ✅ RAG: Retrieve relevant medical context from knowledge base
+    rag_context  = ""
+    sources_used = []
+
+    if RAG_AVAILABLE and not auto_explain and is_knowledge_base_ready():
+        try:
+            category = detect_query_category(user_message)
+            chunks   = retrieve_context(user_message, n_results=3, category_filter=category)
+            if chunks:
+                rag_context  = format_context_for_claude(chunks)
+                sources_used = list(set(c['source'] for c in chunks))
+                logger.info(f"RAG | query='{user_message[:40]}' | chunks={len(chunks)} | category={category}")
+        except Exception as e:
+            logger.error(f"RAG retrieval failed: {e}")
+
     if auto_explain:
         system_prompt = """You are a medical AI assistant. Explain diabetes risk results in plain English.
 Be direct, empathetic, and concise. 2-3 sentences max. No bullet points. No medical jargon."""
+
+    elif rag_context:
+        # ✅ RAG-powered prompt — Claude answers using retrieved WHO + ADA guidelines
+        system_prompt = f"""You are a friendly medical assistant in a diabetes prediction app.
+The patient result: {'DIABETIC' if prediction==1 else 'NOT DIABETIC'} | Risk: {risk_percent}% ({risk_category})
+
+USE THESE VERIFIED MEDICAL GUIDELINES TO ANSWER:
+─────────────────────────────────────────
+{rag_context}
+─────────────────────────────────────────
+
+INSTRUCTIONS:
+- Base your answer on the medical guidelines above
+- Be warm, friendly and concise — 3-5 lines max
+- Naturally cite the source e.g. "According to ADA guidelines..."
+- If guidelines don't fully cover the question, use general knowledge
+- Always end with: consult your doctor for personal medical advice"""
+
     else:
+        # Fallback if RAG not ready yet (before setup_rag.py is run)
         system_prompt = f"""You are a friendly, conversational medical assistant in a diabetes prediction app.
 The patient's result is: {'DIABETIC' if prediction==1 else 'NOT DIABETIC'}.
 Their diabetes risk score is: {risk_percent}% ({risk_category} risk).
@@ -752,16 +816,21 @@ Their diabetes risk score is: {risk_percent}% ({risk_category} risk).
 - Keep responses SHORT (3-5 lines max)
 - Empathize first, then give 1 practical tip
 - Never lecture unless asked
-Always end with a reminder to consult their doctor."""
+Always end with a reminder to consult their doctor for medical decisions."""
 
     response = http_requests.post(
         'https://api.anthropic.com/v1/messages',
         headers={'x-api-key':ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01','content-type':'application/json'},
-        json={'model':'claude-haiku-4-5-20251001','max_tokens':300,'system':system_prompt,
+        json={'model':'claude-haiku-4-5-20251001','max_tokens':400,'system':system_prompt,
               'messages':[{'role':'user','content':user_message}]}
     )
     reply = response.json()['content'][0]['text']
-    return jsonify({'reply': reply})
+
+    return jsonify({
+        'reply':    reply,
+        'rag_used': bool(rag_context),
+        'sources':  sources_used
+    })
 
 
 # ════════════════════════════════════════
@@ -776,11 +845,12 @@ def api_health():
         'version':   '1.0.0',
         'models':    list(MODELS.keys()),
         'latest':    LATEST_VERSION,
+        'rag':       get_rag_stats() if RAG_AVAILABLE else {'status': 'disabled'},  # ✅ RAG stats
         'timestamp': datetime.utcnow().isoformat()
     })
 
 @app.route('/api/predict', methods=['POST'])
-@rate_limit(max_calls=10, window_seconds=60)  # ✅ Rate limited: 10/minute for public API
+@rate_limit(max_calls=10, window_seconds=60)
 def api_predict():
     start_time = time.time()
     data = request.json
@@ -791,7 +861,6 @@ def api_predict():
     if errors:
         return jsonify({'error':'Validation failed','details':errors}),422
 
-    # ✅ Model versioning support
     version = data.get('model_version', LATEST_VERSION)
     active_model, used_version = get_model_for_version(version)
 
@@ -819,7 +888,6 @@ def api_predict():
         return jsonify({'error':str(e)}),500
 
 
-# ✅ NEW: Model versions info
 @app.route('/api/models', methods=['GET'])
 def api_models():
     return jsonify({
@@ -829,7 +897,6 @@ def api_models():
     })
 
 
-# ✅ NEW: History API for comparison mode
 @app.route('/api/history', methods=['GET'])
 @login_required
 def api_history():
@@ -838,40 +905,25 @@ def api_history():
     return jsonify({'history':history,'total':len(history)})
 
 
-# ✅ NEW: DATA EXPORT — CSV
 @app.route('/api/export/csv', methods=['GET'])
 @login_required
 def export_csv():
     predictions = Prediction.query.filter_by(user_id=current_user.id).order_by(Prediction.created_at.asc()).all()
-
     output = io.StringIO()
     writer = csv.writer(output)
-
-    # Header
     writer.writerow(['Date','Risk %','Category','Prediction','Glucose','BMI','Blood Pressure',
                      'Skin Thickness','Insulin','DPF','Age','Pregnancies'])
-    # Data
     for p in predictions:
-        writer.writerow([
-            p.created_at.strftime('%Y-%m-%d %H:%M'),
-            p.risk_percent, p.risk_category,
-            'Diabetic' if p.prediction==1 else 'Not Diabetic',
-            p.glucose, p.bmi, p.bloodpressure,
-            p.skinthickness, p.insulin, p.dpf, p.age, p.pregnancies
-        ])
-
+        writer.writerow([p.created_at.strftime('%Y-%m-%d %H:%M'),p.risk_percent,p.risk_category,
+            'Diabetic' if p.prediction==1 else 'Not Diabetic',p.glucose,p.bmi,p.bloodpressure,
+            p.skinthickness,p.insulin,p.dpf,p.age,p.pregnancies])
     output.seek(0)
     logger.info(f"DATA_EXPORT | user={current_user.email} | format=csv | records={len(predictions)}")
-
-    return send_file(
-        io.BytesIO(output.getvalue().encode()),
-        as_attachment=True,
+    return send_file(io.BytesIO(output.getvalue().encode()), as_attachment=True,
         download_name=f'DiabetesAI_History_{current_user.name.replace(" ","_")}_{datetime.now().strftime("%Y%m%d")}.csv',
-        mimetype='text/csv'
-    )
+        mimetype='text/csv')
 
 
-# ✅ NEW: DATA EXPORT — JSON
 @app.route('/api/export/json', methods=['GET'])
 @login_required
 def export_json():
@@ -887,20 +939,16 @@ def export_json():
             'risk_category': p.risk_category,
             'prediction':    'Diabetic' if p.prediction==1 else 'Not Diabetic',
             'inputs': {
-                'glucose':       p.glucose, 'bmi':          p.bmi,
-                'bloodpressure': p.bloodpressure, 'insulin': p.insulin,
-                'age':           p.age, 'pregnancies':      p.pregnancies,
-                'skinthickness': p.skinthickness, 'dpf':     p.dpf
+                'glucose':p.glucose,'bmi':p.bmi,'bloodpressure':p.bloodpressure,
+                'insulin':p.insulin,'age':p.age,'pregnancies':p.pregnancies,
+                'skinthickness':p.skinthickness,'dpf':p.dpf
             }
         } for p in predictions]
     }
     logger.info(f"DATA_EXPORT | user={current_user.email} | format=json | records={len(predictions)}")
-    return send_file(
-        io.BytesIO(json.dumps(data, indent=2).encode()),
-        as_attachment=True,
+    return send_file(io.BytesIO(json.dumps(data,indent=2).encode()), as_attachment=True,
         download_name=f'DiabetesAI_History_{current_user.name.replace(" ","_")}_{datetime.now().strftime("%Y%m%d")}.json',
-        mimetype='application/json'
-    )
+        mimetype='application/json')
 
 
 @app.route('/api/docs', methods=['GET'])
