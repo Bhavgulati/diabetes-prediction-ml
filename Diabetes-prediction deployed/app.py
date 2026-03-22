@@ -78,6 +78,14 @@ except Exception as e:
     RAG_AVAILABLE = False
     print(f"⚠️  RAG not available (run rag/setup_rag.py first): {e}")
 
+if RAG_AVAILABLE and not is_knowledge_base_ready():
+    try:
+        from rag_engine import build_knowledge_base
+        build_knowledge_base()
+        print("✅ RAG knowledge base built automatically")
+    except Exception as e:
+        print(f"⚠️  RAG auto-build failed: {e}")    
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
