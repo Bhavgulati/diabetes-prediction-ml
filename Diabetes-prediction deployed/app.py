@@ -766,26 +766,16 @@ def chat():
     rag_context  = ""
     sources_used = []
 
-    if RAG_AVAILABLE and not auto_explain:
-        # ✅ Lazy build — runs once on first chat, not at startup
-        if not is_knowledge_base_ready():
-            try:
-                from rag_engine import build_knowledge_base
-                build_knowledge_base()
-                logger.info("RAG knowledge base built on first request")
-            except Exception as e:
-                logger.error(f"RAG lazy build failed: {e}")
-        # Retrieve context if ready
-        if is_knowledge_base_ready():
-            try:
-                category = detect_query_category(user_message)
-                chunks   = retrieve_context(user_message, n_results=3, category_filter=category)
-                if chunks:
-                    rag_context  = format_context_for_claude(chunks)
-                    sources_used = list(set(c['source'] for c in chunks))
-                    logger.info(f"RAG | query='{user_message[:40]}' | chunks={len(chunks)} | category={category}")
-            except Exception as e:
-                logger.error(f"RAG retrieval failed: {e}")
+    if RAG_AVAILABLE and not auto_explain and is_knowledge_base_ready():
+        try:
+            category = detect_query_category(user_message)
+            chunks   = retrieve_context(user_message, n_results=3, category_filter=category)
+            if chunks:
+                rag_context  = format_context_for_claude(chunks)
+                sources_used = list(set(c['source'] for c in chunks))
+                logger.info(f"RAG | query='{user_message[:40]}' | chunks={len(chunks)} | category={category}")
+        except Exception as e:
+            logger.error(f"RAG retrieval failed: {e}")
 
     if auto_explain:
         system_prompt = """You are a medical AI assistant. Explain diabetes risk results in plain English.
