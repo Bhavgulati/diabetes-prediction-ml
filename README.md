@@ -47,7 +47,7 @@ This isn't a Jupyter notebook. This is a **live, deployed, production applicatio
 | 📚 **RAG Architecture** | Retrieves from WHO + ADA clinical guidelines before answering |
 | 🎯 **Context-Aware** | Knows patient's exact risk score and biomarkers |
 | 💬 **Auto-Explanation** | Automatically explains SHAP results in plain English on load |
-| 🌍 **Multi-Language** | English 🇬🇧 Hindi 🇮🇳 Spanish 🇪🇸 |
+| 🌍 **Language** | English 🇬🇧 |
 
 ### 📄 Clinical PDF Report
 | Feature | Description |
