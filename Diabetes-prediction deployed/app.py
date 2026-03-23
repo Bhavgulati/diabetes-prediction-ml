@@ -242,13 +242,21 @@ except Exception:
 load_model_version('v1', 'diabetes-prediction-rfc-model.pkl')
 load_model_version('v2', 'diabetes-prediction-rfc-model-v2.pkl')
 
-LATEST_VERSION = 'v2'
-if MODELS.get('v2'):
-    MODEL_META['v2']['is_latest'] = True
+MODEL_META['v1']['is_latest'] = False
+MODEL_META['v2']['is_latest'] = False
 
-rf_model = MODELS.get('v1')
+if MODELS.get('v2') is not None:
+    LATEST_VERSION = 'v2'
+    MODEL_META['v2']['is_latest'] = True
+elif MODELS.get('v1') is not None:
+    LATEST_VERSION = 'v1'
+    MODEL_META['v1']['is_latest'] = True
+else:
+    raise RuntimeError("No models could be loaded.")
+
+rf_model = MODELS.get(LATEST_VERSION)
 if rf_model is None:
-    raise RuntimeError("Could not load model v1")
+    raise RuntimeError(f"Could not load latest model: {LATEST_VERSION}")
 
 explainer = shap.TreeExplainer(rf_model)
 

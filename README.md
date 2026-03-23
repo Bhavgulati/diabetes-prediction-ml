@@ -40,7 +40,6 @@ This isn't a Jupyter notebook. This is a **live, deployed, production applicatio
 | 🔬 **SHAP Explainability** | Tells the user *why* they got their risk score — personalised per prediction |
 | 🤖 **Model Comparison** | Random Forest vs Logistic Regression vs XGBoost — side by side accuracy metrics |
 | 📊 **Feature Importance** | Visual chart of which biomarkers matter most |
-| ⚡ **Real-time Risk Preview** | Risk score updates live as the user types — no form submission needed |
 
 ### 🏥 Medical AI Chatbot (RAG-Powered)
 | Feature | Description |
@@ -205,18 +204,15 @@ pytest test_app.py -v
 
 ---
 
-## 📊 Model Performance
+## 📊 Model Performance on Expanded Dataset
 
 | Model | Accuracy | Precision | Recall | F1 Score |
-|---|---|---|---|---|
-| 🏆 **Random Forest** | **98.7%** | **97.4%** | **96.1%** | **96.7%** |
-| Logistic Regression | 76.6% | 72.1% | 65.8% | 68.8% |
-| XGBoost | 97.4% | 95.2% | 94.7% | 94.9% |
+|---|---:|---:|---:|---:|
+| 🏆 **Random Forest (Tuned, threshold=0.6)** | **93.8%** | **60.4%** | **84.6%** | **70.4%** |
+| Logistic Regression (cleaned, threshold=0.6) | 89.3% | 44.0% | 82.8% | 57.5% |
+| Random Forest + SMOTE | 92.4% | 54.0% | 85.2% | 66.2% |
 
-> Random Forest wins — that's why we use it for predictions.
-
----
-
+> Tuned Random Forest delivered the best overall screening performance on the expanded 100,768-record dataset, achieving the strongest balance between recall, precision, and F1-score after threshold calibration.
 ## 🗂️ Project Structure
 
 ```
