@@ -213,7 +213,12 @@ def load_model_version(version, filename):
         return True
     return False
 
-df = pd.read_csv(os.path.join(BASE_DIR, '..', 'diabetes.csv'))
+_csv = os.path.join(BASE_DIR, '..', 'diabetes_combined.csv')
+if not os.path.exists(_csv):
+    _csv = os.path.join(BASE_DIR, '..', 'diabetes.csv')
+df = pd.read_csv(_csv)
+
+
 X = df.drop('Outcome', axis=1)
 y = df['Outcome']
 FEATURE_NAMES = list(X.columns)
@@ -235,10 +240,11 @@ except Exception:
     xgb_available = False
 
 load_model_version('v1', 'diabetes-prediction-rfc-model.pkl')
+load_model_version('v2', 'diabetes-prediction-rfc-model-v2.pkl')
 
-LATEST_VERSION = 'v1'
-if MODELS.get('v1'):
-    MODEL_META['v1']['is_latest'] = True
+LATEST_VERSION = 'v2'
+if MODELS.get('v2'):
+    MODEL_META['v2']['is_latest'] = True
 
 rf_model = MODELS.get('v1')
 if rf_model is None:
