@@ -968,6 +968,19 @@ def from_json_filter(value):
 with app.app_context():
     db.create_all()
 
+def keep_alive():
+    import time
+    time.sleep(30)
+    while True:
+        try:
+            http_requests.get("https://diabetes-prediction-ml-2-dt3u.onrender.com/api/health", timeout=10)
+            logger.info("KEEP_ALIVE | pinged /api/health successfully")
+        except Exception as e:
+            logger.warning(f"KEEP_ALIVE | ping failed: {e}")
+        time.sleep(840)
+
+threading.Thread(target=keep_alive, daemon=True).start()
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     app.run(host='0.0.0.0', port=port, debug=False)
