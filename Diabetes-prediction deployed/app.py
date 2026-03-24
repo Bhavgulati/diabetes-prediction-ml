@@ -28,7 +28,7 @@ from datetime import datetime
 from functools import wraps
 from collections import defaultdict
 
-# ── PDF ──
+# ── PDF ─
 try:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
