@@ -52,7 +52,7 @@ This isn't a Jupyter notebook. This is a **live, deployed, production applicatio
 ### 📄 Clinical PDF Report
 | Feature | Description |
 |---|---|
-| 🏥 **Hospital-Grade Design** | Navy header, risk stripe, patient info, biomarker table with NORMAL/HIGH/PRE-DIABETIC labels |
+| 🏥 **Hospital-Grade Design** | Navy header, risk stripe, patient info, biomarker table with NORMAL/HIGH/PRE-DIABETIC labels|
 | 📊 **SHAP Analysis Table** | ▲ INCREASES RISK / ▼ REDUCES RISK per biomarker |
 | 📋 **Clinical Recommendations** | Colour-coded by category: IMMEDIATE, MEDICAL, DIETARY, LIFESTYLE |
 | ⚠️ **Urgency Banner** | Red/Amber/Green alert based on risk category |
@@ -71,7 +71,7 @@ This isn't a Jupyter notebook. This is a **live, deployed, production applicatio
 ### 🎨 Frontend Features
 | Feature | Description |
 |---|---|
-| ❤️ **Health Score 0-100** | Circular gauge like Apple Health — holistic score across all biomarkers |
+| ❤️ **Health Score 0-100** | Circular gauge like Apple Health — holistic score across all 8 biomarkers |
 | 📈 **Comparison Mode** | Previous vs current risk — shows ▼ 33% improvement |
 | 📊 **Progress Bar** | Shows form completion percentage in real time |
 | 💡 **Tooltip Guidance** | Every field has medical guidance — what is normal, why it matters |
